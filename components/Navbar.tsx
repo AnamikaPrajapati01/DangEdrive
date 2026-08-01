@@ -69,6 +69,14 @@ export default function Navbar() {
     };
   }, [pathname]);
 
+  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (pathname === '/') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setActiveSection('home');
+    }
+  };
+
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: typeof navItems[0]) => {
     if (pathname === '/') {
       e.preventDefault();
@@ -115,7 +123,7 @@ export default function Navbar() {
             )}
           >
             {/* Logo + Company Name */}
-            <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
+            <Link href="/" onClick={handleLogoClick} className="flex items-center gap-2 sm:gap-3 group">
               <motion.div
                 whileHover={{ rotate: 3, scale: 1.05 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}

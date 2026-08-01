@@ -116,7 +116,7 @@ export default function Hero() {
               className="relative w-[72%] h-[78%] rounded-3xl overflow-hidden shadow-2xl border-4 border-white z-10 group"
             >
               <Image
-                src="/image/car.jpg"
+                src="/image/car.jpeg"
                 alt="Dang E Drive Main Banner"
                 fill
                 priority

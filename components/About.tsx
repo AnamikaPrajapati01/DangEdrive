@@ -28,13 +28,14 @@ export default function About() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="relative w-full h-64 sm:h-80 lg:h-[430px] rounded-3xl overflow-hidden shadow-2xl border-2 border-white/15 group"
+            className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden shadow-2xl border-2 border-white/15 group"
           >
             <Image
-              src="/image/taxi.jpg"
+              src="/image/car3.jpeg"
               alt="Dang E Drive Taxi"
               fill
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
+              className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              style={{ objectPosition: '50% 50%' }}
               sizes="(max-width: 1024px) 100vw, 50vw"
               priority
             />

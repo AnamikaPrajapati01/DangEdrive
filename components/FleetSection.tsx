@@ -24,15 +24,16 @@ export default function FleetSection() {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.5 }}
-                className="relative w-full h-[280px] sm:h-[380px] lg:h-[400px]"
+                className="relative w-full aspect-[16/10]"
               >
                 <Image
-                  src="/image/car 2.jpg"
+                  src="/image/car2.jpeg"
                   alt="GAC Aion Y Plus Electric Vehicle"
                   fill
-                  className="object-cover"
+                  className="object-cover object-center"
                   priority
                   sizes="(max-width: 1024px) 100vw, 50vw"
+                  style={{ objectPosition: '50% 50%' }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0B3D26]/40 via-transparent to-transparent opacity-60" />
               </motion.div>

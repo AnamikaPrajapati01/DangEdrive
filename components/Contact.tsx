@@ -20,6 +20,7 @@ type ContactFormData = z.infer<typeof contactSchema>;
 export default function Contact() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const {
     register,
@@ -44,16 +45,33 @@ export default function Contact() {
 
   const onSubmit = async (data: ContactFormData) => {
     setIsSubmitting(true);
-    // Simulate API request delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    reset();
-    
-    // Auto-hide success message after 5 seconds
-    setTimeout(() => {
-      setIsSuccess(false);
-    }, 5000);
+    setSubmitError('');
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result?.error || 'Failed to send your request.');
+      }
+
+      setIsSuccess(true);
+      reset();
+
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => {
+        setIsSuccess(false);
+      }, 5000);
+    } catch (err: any) {
+      setSubmitError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -265,6 +283,18 @@ export default function Contact() {
                       </p>
                     )}
                   </div>
+
+                  {/* Server error banner */}
+                  {submitError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-2 text-sm text-[#DC2626] font-semibold bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+                    >
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      {submitError}
+                    </motion.div>
+                  )}
 
                   {/* Submit Button with Gradient, Glow & Scale */}
                   <div className="pt-2">
