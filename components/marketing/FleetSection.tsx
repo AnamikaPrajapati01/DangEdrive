@@ -2,17 +2,28 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { MapPin } from 'lucide-react';
 
-export default function FleetSection() {
+export interface PublicCar {
+  id: string;
+  carNumber: string;
+  from: string;
+  to: string;
+}
+
+interface FleetSectionProps {
+  cars?: PublicCar[];
+}
+
+export default function FleetSection({ cars = [] }: FleetSectionProps) {
+  const count = cars.length;
+
   return (
     <section id="fleet" className="py-24 sm:py-28 bg-[#FFFFFF] relative overflow-hidden">
-      {/* Background ambient accents */}
       <div className="absolute top-1/3 right-0 w-96 h-96 bg-[#EAF7EC]/80 rounded-full filter blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          
-          {/* Left Side - Car Image with Zoom Reveal + Hover Soft Shine Effect */}
           <motion.div
             initial={{ opacity: 0, scale: 0.92 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -28,7 +39,7 @@ export default function FleetSection() {
               >
                 <Image
                   src="/image/car2.jpeg"
-                  alt="GAC Aion Y Plus Electric Vehicle"
+                  alt="Dang E Drive electric fleet"
                   fill
                   className="object-cover object-center"
                   priority
@@ -40,7 +51,6 @@ export default function FleetSection() {
             </div>
           </motion.div>
 
-          {/* Right Side - Fleet Info with Text Fade Reveal */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -51,39 +61,44 @@ export default function FleetSection() {
             <span className="text-lg sm:text-xl font-extrabold text-[#4CAF50] tracking-[0.2em] uppercase block mb-2">
               OUR FLEET
             </span>
-            
+
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#0F5A35] font-heading tracking-tight leading-snug">
-              10 GAC Aion Y Plus Electric Taxis
+              {count} Electric Taxi{count === 1 ? '' : 's'} on the Road
             </h2>
-            
+
             <p className="text-[#64748B] text-base leading-relaxed">
-              Our entire fleet is made up of brand-new <strong className="text-[#1A1A1A]">GAC Aion Y Plus</strong> electric SUVs. 
-              They are spacious, quiet, and produce zero emissions. 
-              Every vehicle is kept clean and is regularly checked to make sure your ride is safe and comfortable.
-            </p>
-            
-            <p className="text-[#64748B] text-base leading-relaxed">
-              All our drivers are experienced professionals who know the roads of Nepal well. 
-              Whether you are traveling within the city or going on a long trip, 
-              we are here to provide a smooth and reliable service.
+              Our fleet is managed live by Dang E Drive. Vehicle count and routes update when
+              the admin adds or edits cars in the portal.
             </p>
 
+            {count > 0 ? (
+              <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {cars.map((car) => (
+                  <li
+                    key={car.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#DCE7DD] bg-[#F8FAF8] px-3 py-2.5 text-sm"
+                  >
+                    <span className="font-bold text-[#0F5A35]">{car.carNumber}</span>
+                    <span className="inline-flex items-center gap-1 text-[#64748B] text-xs">
+                      <MapPin className="w-3.5 h-3.5 text-[#4CAF50]" />
+                      {car.from} → {car.to}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-[#64748B]">Fleet details will appear once cars are added.</p>
+            )}
+
             <div className="flex flex-wrap gap-3 pt-2">
-              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD] shadow-xs">
-                100% Electric
+              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD]">
+                Live fleet data
               </span>
-              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD] shadow-xs">
-                Air Conditioned
-              </span>
-              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD] shadow-xs">
-                5 Seater
-              </span>
-              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD] shadow-xs">
-                Professional Drivers
+              <span className="px-4 py-2 rounded-full bg-[#EAF7EC] text-[#0F5A35] text-sm font-semibold border border-[#DCE7DD]">
+                {count} vehicles
               </span>
             </div>
           </motion.div>
-
         </div>
       </div>
     </section>

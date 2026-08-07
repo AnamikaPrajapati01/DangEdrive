@@ -146,6 +146,7 @@ export default function Hero() {
                 src="/image/a53b5bb313b0fcf187320d2d0250527c.jpg"
                 alt="Corner image 1"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             </motion.div>
@@ -169,6 +170,7 @@ export default function Hero() {
                 src="/image/86f9c56e7d122e524b5e9ffe7fa07f9c.jpg"
                 alt="Corner image 2"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             </motion.div>
@@ -192,6 +194,7 @@ export default function Hero() {
                 src="/image/f46eef08e76b365a8ce4b5c6bcf06db1.jpg"
                 alt="Corner image 3"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             </motion.div>
@@ -215,6 +218,7 @@ export default function Hero() {
                 src="/image/83c6f3cd0157feda89e199e4ae0ef2ad.webp"
                 alt="Corner image 4"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             </motion.div>

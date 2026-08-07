@@ -1,10 +1,17 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Email service is not configured.' },
+        { status: 503 }
+      );
+    }
+
+    const resend = new Resend(apiKey);
     const { name, email, phone, message } = await req.json();
 
     // Basic validation
@@ -15,10 +22,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const toEmail = process.env.CONTACT_TO_EMAIL || 'subu22725@gmail.com';
     const { data, error } = await resend.emails.send({
-      from: 'Dang E Drive <onboarding@resend.dev>', // sandbox sender — swap once domain is verified
-      to: ['subu22725@gmail.com'], // your Gmail — receives every contact form submission
-      replyTo: email, // lets you hit "Reply" and respond directly to the customer
+      from: 'Dang E Drive <onboarding@resend.dev>',
+      to: [toEmail],
+      replyTo: email,
       subject: `New Booking Request from ${name}`,
       html: `
         <h2>New Booking Request — Dang E Drive</h2>

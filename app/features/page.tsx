@@ -1,9 +1,6 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
-import Features from '@/components/Features';
-import Footer from '@/components/Footer';
-import SectionDivider from '@/components/SectionDivider';
+import { Navbar, Features, Footer, SectionDivider } from '@/components/marketing';
 import { motion } from 'framer-motion';
 import { CalendarPlus, ClipboardCheck, Car, Smile } from 'lucide-react';
 

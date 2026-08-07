@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trip } from '@/lib/types';
+import { Trip } from './types';
 import { Search, Edit, Trash2, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 

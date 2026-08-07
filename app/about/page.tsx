@@ -1,8 +1,6 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import SectionDivider from '@/components/SectionDivider';
+import { Navbar, Footer, SectionDivider } from '@/components/marketing';
 import { motion } from 'framer-motion';
 import { Target, Eye, ShieldCheck, Heart } from 'lucide-react';
 import Image from 'next/image';

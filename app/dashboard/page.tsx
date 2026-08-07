@@ -1,370 +1,288 @@
 'use client';
 
-import { useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import TripForm from '@/components/TripForm';
-import TripTable from '@/components/TripTable';
-import { INITIAL_TRIPS, INITIAL_TAXIS } from '@/lib/data';
-import { Trip, Taxi } from '@/lib/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Sidebar,
+  Header,
+  CarsPanel,
+  RevenuePanel,
+  MonthlyReport,
+  ShareholdersPanel,
+} from '@/components/portal';
+import type { DailyRevenue, FleetCar, SessionUser } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, Coins, CheckCircle, Navigation, ShieldCheck, Car, Key, Settings } from 'lucide-react';
-import Image from 'next/image';
+import { Car, Coins, CalendarRange, Eye, ShieldCheck } from 'lucide-react';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  // Dynamic state for mock database storage
-  const [trips, setTrips] = useState<Trip[]>(INITIAL_TRIPS);
-  const [taxis, setTaxis] = useState<Taxi[]>(INITIAL_TAXIS);
-  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [cars, setCars] = useState<FleetCar[]>([]);
+  const [revenues, setRevenues] = useState<DailyRevenue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [monthTotal, setMonthTotal] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // ----------------------------------------------------
-  // TRIP LOGIC (ADD / EDIT / DELETE)
-  // ----------------------------------------------------
-  const handleAddOrEditTrip = (data: Omit<Trip, 'id' | 'status'> & { id?: string }) => {
-    if (data.id) {
-      // Edit mode
-      setTrips((prev) =>
-        prev.map((trip) =>
-          trip.id === data.id
-            ? { ...trip, ...data, amount: Number(data.amount) }
-            : trip
-        )
-      );
-      setEditingTrip(null);
-    } else {
-      // Add mode
-      const newTrip: Trip = {
-        id: `tr-${Date.now()}`,
-        taxiNumber: data.taxiNumber,
-        driverName: data.driverName,
-        from: data.from,
-        destination: data.destination,
-        amount: Number(data.amount),
-        date: data.date,
-        status: 'Running', // default status
-      };
+  const loadData = useCallback(async () => {
+    const [carsRes, revRes, monthRes] = await Promise.all([
+      fetch('/api/cars', { cache: 'no-store' }),
+      fetch('/api/revenue', { cache: 'no-store' }),
+      fetch(
+        `/api/reports/monthly?year=${new Date().getFullYear()}&month=${new Date().getMonth() + 1}`,
+        { cache: 'no-store' }
+      ),
+    ]);
 
-      setTrips((prev) => [newTrip, ...prev]);
-
-      // Automatically update the taxi status in the fleet to 'On Trip'
-      setTaxis((prev) =>
-        prev.map((t) =>
-          t.number === data.taxiNumber ? { ...t, status: 'On Trip', tripsCompleted: t.tripsCompleted + 1 } : t
-        )
-      );
+    if (carsRes.ok) {
+      const data = await carsRes.json();
+      setCars(data.cars || []);
     }
-  };
-
-  const handleEditSelect = (trip: Trip) => {
-    setEditingTrip(trip);
-    // Auto shift view to the trip-entry tab if not already there
-    setActiveTab('trip-entry');
-  };
-
-  const handleDeleteTrip = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this trip record?')) {
-      setTrips((prev) => prev.filter((trip) => trip.id !== id));
+    if (revRes.ok) {
+      const data = await revRes.json();
+      setRevenues(data.revenues || []);
     }
+    if (monthRes.ok) {
+      const data = await monthRes.json();
+      setMonthTotal(data.grandTotal || 0);
+    }
+  }, []);
+
+  const reloadAfterEdit = useCallback(async () => {
+    await loadData();
+    setRefreshKey((k) => k + 1);
+  }, [loadData]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const boot = async () => {
+      const meRes = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (!meRes.ok) {
+        router.replace('/signin');
+        return;
+      }
+      const meData = await meRes.json();
+      if (cancelled) return;
+      setUser(meData.user);
+      await loadData();
+      if (!cancelled) setLoading(false);
+    };
+    boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadData, router]);
+
+  // Live refresh so shareholders see admin updates without reloading
+  useEffect(() => {
+    if (!user) return;
+    const timer = setInterval(() => {
+      loadData();
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [user, loadData]);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.replace('/signin');
   };
 
-  // ----------------------------------------------------
-  // TAXI FLEET STATUS CONTROLS
-  // ----------------------------------------------------
-  const handleTaxiStatusChange = (taxiId: string, newStatus: Taxi['status']) => {
-    setTaxis((prev) =>
-      prev.map((taxi) =>
-        taxi.id === taxiId ? { ...taxi, status: newStatus } : taxi
-      )
+  const todayRevenue = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return revenues.filter((r) => r.date === today).reduce((sum, r) => sum + r.amount, 0);
+  }, [revenues]);
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-semibold text-text-secondary">Loading live portal...</p>
+        </div>
+      </div>
     );
-  };
+  }
 
-  // ----------------------------------------------------
-  // STATS COMPUTATION (Computed live from current state)
-  // ----------------------------------------------------
-  const totalTripsCount = trips.length;
-  const completedTripsCount = trips.filter((t) => t.status === 'Completed').length;
-  const activeTaxisCount = taxis.filter((t) => t.status === 'On Trip').length;
-  const totalRevenue = trips
-    .filter((t) => t.status === 'Completed' || t.status === 'Running')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const isAdmin = user.role === 'admin';
 
   return (
     <div className="min-h-screen flex bg-slate-50">
-      {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        user={user}
+        onLogout={handleLogout}
       />
 
-      {/* Main Dashboard Portal Container */}
       <div className="flex-1 flex flex-col lg:pl-64 min-w-0">
-        
-        {/* Header bar */}
-        <Header activeTab={activeTab} onMenuClick={() => setIsSidebarOpen(true)} />
+        <Header activeTab={activeTab} onMenuClick={() => setIsSidebarOpen(true)} user={user} />
 
-        {/* Dynamic Workspace Area */}
         <main className="flex-1 p-6 sm:p-8 space-y-8 overflow-y-auto">
-          
-          {/* TAB 1: SYSTEM OVERVIEW */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
-              
-              {/* Top Welcome banner */}
               <div className="p-6 rounded-3xl bg-gradient-to-r from-primary to-primary-hover text-white shadow-md relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full filter blur-2xl pointer-events-none" />
-                <div className="relative z-10 max-w-xl">
-                  <h2 className="text-xl sm:text-2xl font-bold font-heading">Welcome back, Accountant</h2>
+                <div className="relative z-10 max-w-2xl">
+                  <h2 className="text-xl sm:text-2xl font-bold font-heading">
+                    Welcome, {user.name}
+                  </h2>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    You have full access to record and monitor taxi journeys originating from Dang to destinations nationwide. Update vehicle schedules and verify fare collections below.
+                    {isAdmin
+                      ? 'Fully dynamic portal: add cars, daily revenue, and shareholder logins. Website fleet count updates automatically.'
+                      : 'Live view-only access. Numbers refresh automatically when the admin updates data.'}
                   </p>
                 </div>
               </div>
 
-              {/* Stat Card Panel Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                
-                {/* Stat 1: Total Trips recorded */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 text-primary flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5 text-accent" />
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                    <Car className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-text-secondary">Today's Total Runs</span>
+                    <span className="text-xs font-semibold text-text-secondary">Total Cars</span>
                     <h3 className="text-2xl font-black text-primary font-heading leading-tight mt-0.5">
-                      {totalTripsCount}
+                      {cars.length}
                     </h3>
                   </div>
                 </div>
 
-                {/* Stat 2: Total Revenue Collected */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 text-primary flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
                     <Coins className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-text-secondary">Revenue Logged</span>
+                    <span className="text-xs font-semibold text-text-secondary">Today&apos;s Revenue</span>
                     <h3 className="text-xl sm:text-2xl font-black text-primary font-heading leading-tight mt-0.5">
-                      {formatCurrency(totalRevenue)}
+                      {formatCurrency(todayRevenue)}
                     </h3>
                   </div>
                 </div>
 
-                {/* Stat 3: Taxis On Trip */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 text-primary flex items-center justify-center shrink-0">
-                    <Navigation className="w-5 h-5 text-accent" />
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                    <CalendarRange className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-text-secondary">Vehicles On Trip</span>
-                    <h3 className="text-2xl font-black text-primary font-heading leading-tight mt-0.5">
-                      {activeTaxisCount} <span className="text-xs text-text-secondary font-medium">/ 10</span>
+                    <span className="text-xs font-semibold text-text-secondary">This Month Total</span>
+                    <h3 className="text-xl sm:text-2xl font-black text-primary font-heading leading-tight mt-0.5">
+                      {formatCurrency(monthTotal)}
                     </h3>
                   </div>
                 </div>
 
-                {/* Stat 4: Completed Trips */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 text-primary flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-5 h-5 text-accent" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-text-secondary">Completed Runs</span>
-                    <h3 className="text-2xl font-black text-primary font-heading leading-tight mt-0.5">
-                      {completedTripsCount}
-                    </h3>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Grid block: Recent items list & quick shortcut */}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                
-                {/* Column 1 & 2: Trip Table list shortcut */}
-                <div className="xl:col-span-2 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-extrabold text-primary uppercase tracking-wider">
-                      Recent Trip Entries
-                    </h4>
-                    <button
-                      onClick={() => setActiveTab('trip-entry')}
-                      className="text-xs font-bold text-accent hover:underline hover:text-accent-hover"
-                    >
-                      Manage All
-                    </button>
-                  </div>
-                  <TripTable
-                    trips={trips}
-                    onEditTrip={handleEditSelect}
-                    onDeleteTrip={handleDeleteTrip}
-                  />
-                </div>
-
-                {/* Column 3: Quick Info Card */}
-                <div className="space-y-6">
-                  <h4 className="text-sm font-extrabold text-primary uppercase tracking-wider">
-                    Administrative Quick Stats
-                  </h4>
-                  <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4 text-sm">
-                    <div className="flex items-center space-x-3 text-primary font-semibold border-b border-slate-50 pb-3">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                    {isAdmin ? (
                       <ShieldCheck className="w-5 h-5 text-accent" />
-                      <span>Security & Verification</span>
-                    </div>
-                    <ul className="space-y-3.5 text-xs text-text-secondary">
-                      <li className="flex justify-between">
-                        <span>Total Fleet Vehicles</span>
-                        <span className="font-bold text-text-dark">10 Taxis</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>Active Drivers Checked</span>
-                        <span className="font-bold text-text-dark">10 Drivers</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>Base Origin Office</span>
-                        <span className="font-bold text-text-dark">Ghorahi, Dang</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>Average Trip Amount</span>
-                        <span className="font-bold text-text-dark">
-                          {formatCurrency(totalTripsCount ? Math.round(totalRevenue / totalTripsCount) : 0)}
-                        </span>
-                      </li>
-                    </ul>
-                    <hr className="border-slate-50" />
-                    <button
-                      onClick={() => setActiveTab('trip-entry')}
-                      className="w-full py-3 text-xs text-center font-bold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-primary rounded-xl transition-all"
-                    >
-                      + Create New Log
-                    </button>
+                    ) : (
+                      <Eye className="w-5 h-5 text-accent" />
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-text-secondary">Your Access</span>
+                    <h3 className="text-lg font-black text-primary font-heading leading-tight mt-0.5 capitalize">
+                      {isAdmin ? 'Admin (Edit)' : 'Shareholder (View)'}
+                    </h3>
                   </div>
                 </div>
-
               </div>
 
-            </div>
-          )}
-
-          {/* TAB 2: TRIP ENTRY FORM & TABLE ARCHIVE */}
-          {activeTab === 'trip-entry' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
-              {/* Form Entry Column */}
-              <div className="lg:col-span-4 lg:sticky lg:top-24">
-                <TripForm
-                  onSubmitTrip={handleAddOrEditTrip}
-                  editingTrip={editingTrip}
-                  onCancelEdit={() => setEditingTrip(null)}
-                />
-              </div>
-
-              {/* Table Column */}
-              <div className="lg:col-span-8 h-full">
-                <TripTable
-                  trips={trips}
-                  onEditTrip={handleEditSelect}
-                  onDeleteTrip={handleDeleteTrip}
-                />
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 3: FLEET STATUS MANAGEMENT */}
-          {activeTab === 'fleet' && (
-            <div className="space-y-6">
-              
-              {/* Info panel */}
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start space-x-3">
-                <Settings className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-bold">Accountant Tip: Active Taxi Dispatch</p>
-                  <p className="mt-0.5 leading-relaxed font-medium">
-                    When you register a new trip for a taxi, its status is automatically changed to "On Trip". You can manually override any vehicle's status to "Available" or "Maintenance" below once the driver reports back or checks into the garage.
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <button
+                  onClick={() => setActiveTab('cars')}
+                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-left hover:border-primary/30 transition-colors"
+                >
+                  <p className="text-sm font-bold text-primary">Cars & Routes</p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    Plate number and from → to for each gaadi
                   </p>
-                </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('revenue')}
+                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-left hover:border-primary/30 transition-colors"
+                >
+                  <p className="text-sm font-bold text-primary">Daily Revenue</p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {isAdmin ? 'Add or edit daily collection amounts' : 'View daily collection amounts'}
+                  </p>
+                </button>
+                <button
+                  onClick={() => setActiveTab('monthly')}
+                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-left hover:border-primary/30 transition-colors"
+                >
+                  <p className="text-sm font-bold text-primary">Monthly Totals</p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    Month-end total for each car
+                  </p>
+                </button>
               </div>
 
-              {/* List table */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-5 border-b border-slate-100">
-                  <h3 className="font-bold text-primary font-heading flex items-center">
-                    <Car className="w-5 h-5 text-accent mr-2" />
-                    <span>Vehicle Availability Control Room</span>
-                  </h3>
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h4 className="text-sm font-extrabold text-primary uppercase tracking-wider">
+                    Recent Daily Entries
+                  </h4>
+                  <button
+                    onClick={() => setActiveTab('revenue')}
+                    className="text-xs font-bold text-accent hover:underline"
+                  >
+                    View all
+                  </button>
                 </div>
-
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase select-none">
-                        <th className="px-6 py-4">Vehicle plate</th>
-                        <th className="px-6 py-4">Assigned Driver</th>
-                        <th className="px-6 py-4">Total Runs</th>
-                        <th className="px-6 py-4">Capacity</th>
-                        <th className="px-6 py-4">Current Status</th>
-                        <th className="px-6 py-4">Status Adjustment</th>
+                      <tr className="bg-slate-50 text-xs font-bold text-primary uppercase">
+                        <th className="px-6 py-3">Date</th>
+                        <th className="px-6 py-3">Car</th>
+                        <th className="px-6 py-3">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm">
-                      {taxis.map((taxi) => (
-                        <tr key={taxi.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
-                            {taxi.number}
-                          </td>
-                          <td className="px-6 py-3.5 text-text-dark font-medium whitespace-nowrap">
-                            {taxi.driverName}
-                          </td>
-                          <td className="px-6 py-3.5 text-text-secondary whitespace-nowrap">
-                            {taxi.tripsCompleted} runs
-                          </td>
-                          <td className="px-6 py-3.5 text-text-secondary text-xs whitespace-nowrap">
-                            {taxi.seats} seats ({taxi.hasAC ? 'AC' : 'No AC'})
-                          </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                                taxi.status === 'Available'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : taxi.status === 'On Trip'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse'
-                                  : 'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}
-                            >
-                              {taxi.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap">
-                            <select
-                              value={taxi.status}
-                              onChange={(e) =>
-                                handleTaxiStatusChange(taxi.id, e.target.value as Taxi['status'])
-                              }
-                              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-none bg-white cursor-pointer hover:border-slate-300"
-                            >
-                              <option value="Available">Set Available</option>
-                              <option value="On Trip">Set On Trip</option>
-                              <option value="Maintenance">Set Maintenance</option>
-                            </select>
+                      {revenues.slice(0, 8).map((row) => {
+                        const car = cars.find((c) => c.id === row.carId);
+                        return (
+                          <tr key={row.id}>
+                            <td className="px-6 py-3 text-text-dark">{row.date}</td>
+                            <td className="px-6 py-3 font-bold text-primary">
+                              {car?.carNumber || '—'}
+                            </td>
+                            <td className="px-6 py-3 font-semibold text-primary">
+                              {formatCurrency(row.amount)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {revenues.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-8 text-center text-text-secondary text-sm">
+                            No revenue logged yet. Admin can add daily amounts.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
-
               </div>
-
             </div>
           )}
 
-        </main>
+          {activeTab === 'cars' && (
+            <CarsPanel user={user} cars={cars} onChanged={reloadAfterEdit} />
+          )}
 
+          {activeTab === 'revenue' && (
+            <RevenuePanel user={user} cars={cars} revenues={revenues} onChanged={reloadAfterEdit} />
+          )}
+
+          {activeTab === 'monthly' && <MonthlyReport refreshKey={refreshKey} />}
+
+          {activeTab === 'users' && <ShareholdersPanel user={user} />}
+        </main>
       </div>
     </div>
   );

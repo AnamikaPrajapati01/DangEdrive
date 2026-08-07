@@ -1,6 +1,6 @@
 'use client';
 
-import { Taxi } from '@/lib/types';
+import { Taxi } from './types';
 import { motion } from 'framer-motion';
 import { Star, Users, Wind, CheckCircle2, AlertCircle, AlertTriangle, Phone } from 'lucide-react';
 import Image from 'next/image';

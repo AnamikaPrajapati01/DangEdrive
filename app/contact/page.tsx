@@ -1,9 +1,6 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
-import Contact from '@/components/Contact';
-import Footer from '@/components/Footer';
-import SectionDivider from '@/components/SectionDivider';
+import { Navbar, Contact, Footer, SectionDivider } from '@/components/marketing';
 import Image from 'next/image';
 import { Share2 } from 'lucide-react';
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube } from 'react-icons/fa';

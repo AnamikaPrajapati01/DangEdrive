@@ -1,42 +1,62 @@
-import Navbar from '@/components/Navbar';
-import Hero from '@/components/Hero';
-import About from '@/components/About';
-import Features from '@/components/Features';
-import FleetSection from '@/components/FleetSection';
-import Contact from '@/components/Contact';
-import Footer from '@/components/Footer';
-import StatCard from '@/components/StatCard';
-import SectionDivider from '@/components/SectionDivider';
+import {
+  Navbar,
+  Hero,
+  About,
+  Features,
+  FleetSection,
+  Contact,
+  Footer,
+  StatCard,
+  SectionDivider,
+} from '@/components/marketing';
 import { Car, Users, ShieldCheck, PhoneCall } from 'lucide-react';
+import { readDb } from '@/lib/db';
+import type { FleetCar } from '@/lib/types';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default async function Home() {
+  let cars: FleetCar[] = [];
+  let carCount = 10;
+  let destinations = 1;
+  let shareholderCount = 1;
+
+  try {
+    const db = await readDb();
+    cars = db.cars;
+    carCount = db.cars.length;
+    destinations = [...new Set(db.cars.map((c) => c.to))].length || 1;
+    shareholderCount = db.users.filter((u) => u.role === 'shareholder').length || 1;
+  } catch (error) {
+    console.error('[home] MongoDB unavailable, using fallback stats:', error);
+  }
+
   return (
     <>
       <Navbar />
-      
+
       <main className="flex-1">
-        {/* Hero Landing */}
         <Hero />
 
-        {/* Statistics Section (Floating Cards Row overlapping Hero/About) */}
         <section className="relative z-20 -mt-10 sm:-mt-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
-              value="10 Active"
-              label="Modern Taxis"
-              description="A dedicated local fleet of sedans and 6-seater vehicles always clean and ready."
+              value={`${carCount} Active`}
+              label="Fleet Vehicles"
+              description="Live count from the admin portal — updates when cars are added or removed."
               icon={<Car className="w-6 h-6 text-[#4CAF50]" />}
             />
             <StatCard
-              value="Professional"
-              label="Vetted Drivers"
-              description="Experienced local navigators background-verified for passenger safety."
+              value={`${Math.max(shareholderCount, 1)}+`}
+              label="Shareholders"
+              description="Registered partners who can sign in and view fleet revenue."
               icon={<Users className="w-6 h-6 text-[#4CAF50]" />}
             />
             <StatCard
-              value="Safe & Checked"
-              label="Real-time GPS"
-              description="Every single trip is tracked and monitored by our centralized dispatch office."
+              value={`${destinations || 1} Routes`}
+              label="Destinations"
+              description="Routes currently assigned across the live fleet."
               icon={<ShieldCheck className="w-6 h-6 text-[#4CAF50]" />}
             />
             <StatCard
@@ -48,28 +68,13 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Section Wave Divider into About */}
         <SectionDivider variant="wave" fillColor="#0B3D26" className="-mb-1 mt-12" />
-
-        {/* About Section */}
         <About />
-
-        {/* Section Wave Divider out of About */}
         <SectionDivider variant="curve" fillColor="#F8FAF8" className="-mt-1 bg-[#0B3D26]" />
-
-        {/* Features Value Proposition Grid */}
         <Features />
-
-        {/* Section Angle Divider into Fleet */}
         <SectionDivider variant="angle" fillColor="#FFFFFF" className="-mb-1" />
-
-        {/* Fleet Section (10 Vehicle showcase) */}
-        <FleetSection />
-
-        {/* Section Wave Divider into Contact */}
+        <FleetSection cars={cars} />
         <SectionDivider variant="wave" fillColor="#F8FAF8" className="-mb-1" />
-
-        {/* Contact & Booking Section */}
         <Contact />
       </main>
 
