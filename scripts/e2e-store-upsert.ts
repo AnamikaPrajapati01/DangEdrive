@@ -4,7 +4,7 @@ import { resolve } from 'path';
 config({ path: resolve(process.cwd(), '.env.local') });
 
 async function main() {
-  const { upsertRevenue, listRevenues } = await import('../lib/db/store.ts');
+  const { upsertRevenue, listRevenues } = await import('../lib/db/store');
 
   const date = '2026-08-05';
   await upsertRevenue({ carId: 'car-1', date, amount: 1001, note: 'iso-1' });
