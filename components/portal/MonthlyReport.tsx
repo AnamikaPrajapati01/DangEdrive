@@ -120,7 +120,9 @@ export default function MonthlyReport({ refreshKey = 0 }: { refreshKey?: number 
                   <tr key={row.carId} className="hover:bg-slate-50/50">
                     <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">{row.carNumber}</td>
                     <td className="px-6 py-3.5 text-text-secondary whitespace-nowrap">
-                      {row.from} → {row.to}
+                      {row.from || row.to
+                        ? `${row.from} → ${row.to}`
+                        : <span className="text-slate-400 italic text-xs">No route set</span>}
                     </td>
                     <td className="px-6 py-3.5 text-text-dark">{row.daysLogged}</td>
                     <td className="px-6 py-3.5 font-black text-primary whitespace-nowrap">
