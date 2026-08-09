@@ -16,8 +16,8 @@ const CarSchema = new Schema(
   {
     _id: { type: String, required: true },
     carNumber: { type: String, required: true, unique: true },
-    from: { type: String, required: true },
-    to: { type: String, required: true },
+    from: { type: String, default: '' },
+    to: { type: String, default: '' },
     createdAt: { type: String, required: true },
   },
   { versionKey: false }
@@ -29,6 +29,7 @@ const RevenueSchema = new Schema(
     carId: { type: String, required: true, index: true },
     date: { type: String, required: true, index: true },
     amount: { type: Number, required: true, min: 0 },
+    route: { type: String },
     note: { type: String },
     createdAt: { type: String, required: true },
   },
@@ -48,8 +49,8 @@ export type UserDoc = {
 export type CarDoc = {
   _id: string;
   carNumber: string;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   createdAt: string;
 };
 
@@ -58,6 +59,7 @@ export type RevenueDoc = {
   carId: string;
   date: string;
   amount: number;
+  route?: string;
   note?: string;
   createdAt: string;
 };

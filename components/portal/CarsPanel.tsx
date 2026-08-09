@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Car, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Car, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { FleetCar, SessionUser } from '@/lib/types';
 
 interface CarsPanelProps {
@@ -10,7 +10,7 @@ interface CarsPanelProps {
   onChanged: () => Promise<void>;
 }
 
-const emptyForm = { carNumber: '', from: 'Dang', to: '' };
+const emptyForm = { carNumber: '' };
 
 export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
   const isAdmin = user.role === 'admin';
@@ -28,12 +28,7 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return cars;
-    return cars.filter(
-      (c) =>
-        c.carNumber.toLowerCase().includes(q) ||
-        c.from.toLowerCase().includes(q) ||
-        c.to.toLowerCase().includes(q)
-    );
+    return cars.filter((c) => c.carNumber.toLowerCase().includes(q));
   }, [cars, query]);
 
   const openAdd = () => {
@@ -45,7 +40,7 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
 
   const openEdit = (car: FleetCar) => {
     setEditingId(car.id);
-    setForm({ carNumber: car.carNumber, from: car.from, to: car.to });
+    setForm({ carNumber: car.carNumber });
     setError(null);
     setShowForm(true);
   };
@@ -95,7 +90,7 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
         <div>
           <h3 className="text-lg font-bold text-primary font-heading">Fleet Cars</h3>
           <p className="text-xs text-text-secondary mt-1">
-            {cars.length} cars registered · route & plate details
+          {cars.length} cars registered · plate details
             {!isAdmin && ' · view only'}
           </p>
         </div>
@@ -136,7 +131,7 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
               {error}
             </p>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="text-xs font-bold text-primary uppercase">Car Number</label>
               <input
@@ -144,26 +139,6 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
                 value={form.carNumber}
                 onChange={(e) => setForm((f) => ({ ...f, carNumber: e.target.value }))}
                 placeholder="Ba 2 Cha 1234"
-                className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-primary uppercase">From</label>
-              <input
-                required
-                value={form.from}
-                onChange={(e) => setForm((f) => ({ ...f, from: e.target.value }))}
-                placeholder="Dang"
-                className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-primary uppercase">To (Destination)</label>
-              <input
-                required
-                value={form.to}
-                onChange={(e) => setForm((f) => ({ ...f, to: e.target.value }))}
-                placeholder="Kathmandu"
                 className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -184,7 +159,6 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase">
                 <th className="px-6 py-4">Car Number</th>
-                <th className="px-6 py-4">Route</th>
                 {isAdmin && <th className="px-6 py-4">Actions</th>}
               </tr>
             </thead>
@@ -195,12 +169,6 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
                     <span className="inline-flex items-center gap-2">
                       <Car className="w-4 h-4 text-accent" />
                       {car.carNumber}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5 text-text-dark whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-accent" />
-                      {car.from} → {car.to}
                     </span>
                   </td>
                   {isAdmin && (
@@ -227,7 +195,7 @@ export default function CarsPanel({ user, cars, onChanged }: CarsPanelProps) {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 3 : 2} className="px-6 py-10 text-center text-text-secondary text-sm">
+                  <td colSpan={isAdmin ? 2 : 1} className="px-6 py-10 text-center text-text-secondary text-sm">
                     No cars found.
                   </td>
                 </tr>

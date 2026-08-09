@@ -28,6 +28,7 @@ export interface DailyRevenue {
   carId: string;
   date: string; // YYYY-MM-DD
   amount: number;
+  route?: string;
   note?: string;
   createdAt: string;
 }

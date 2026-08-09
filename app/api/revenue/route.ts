@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     const carId = String(body.carId || '').trim();
     const date = String(body.date || '').trim();
     const amount = Number(body.amount);
+    const route = body.route ? String(body.route).trim() : undefined;
     const note = body.note ? String(body.note).trim() : undefined;
 
     if (!carId || !date || !Number.isFinite(amount) || amount < 0) {
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const revenue = await upsertRevenue({ carId, date, amount, note });
+    const revenue = await upsertRevenue({ carId, date, amount, route, note });
     return NextResponse.json({ revenue }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) {

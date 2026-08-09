@@ -19,6 +19,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
     carId: '',
     date: today,
     amount: '',
+    route: '',
     note: '',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
       carId: cars[0]?.id || '',
       date: today,
       amount: '',
+      route: '',
       note: '',
     });
     setError(null);
@@ -58,6 +60,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
       carId: row.carId,
       date: row.date,
       amount: String(row.amount),
+      route: row.route || '',
       note: row.note || '',
     });
     setError(null);
@@ -78,6 +81,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
           body: JSON.stringify({
             amount: Number(form.amount),
             date: form.date,
+            route: form.route,
             note: form.note,
           }),
         });
@@ -95,6 +99,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
             carId: form.carId,
             date: form.date,
             amount: Number(form.amount),
+            route: form.route,
             note: form.note,
           }),
         });
@@ -176,7 +181,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
               {error}
             </p>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="text-xs font-bold text-primary uppercase">Car</label>
               <select
@@ -191,7 +196,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
                 </option>
                 {cars.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.carNumber} ({c.from} → {c.to})
+                    {c.carNumber}
                   </option>
                 ))}
               </select>
@@ -221,6 +226,15 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 placeholder="8500"
+                className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-primary uppercase">Route</label>
+              <input
+                value={form.route}
+                onChange={(e) => setForm((f) => ({ ...f, route: e.target.value }))}
+                placeholder="e.g. Dang → Butwal"
                 className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none"
               />
             </div>
@@ -267,7 +281,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
                       {car?.carNumber || '—'}
                     </td>
                     <td className="px-6 py-3.5 text-text-secondary whitespace-nowrap">
-                      {car ? `${car.from} → ${car.to}` : '—'}
+                      {row.route || '—'}
                     </td>
                     <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">

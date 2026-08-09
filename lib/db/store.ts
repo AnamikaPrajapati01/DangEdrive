@@ -106,15 +106,15 @@ function mapUser(u: { _id: unknown; name: string; email: string; passwordHash: s
 function mapCar(c: {
   _id: unknown;
   carNumber: string;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   createdAt: string;
 }): FleetCar {
   return {
     id: String(c._id),
     carNumber: c.carNumber,
-    from: c.from,
-    to: c.to,
+    from: c.from ?? '',
+    to: c.to ?? '',
     createdAt: c.createdAt,
   };
 }
@@ -124,6 +124,7 @@ function mapRevenue(r: {
   carId: string;
   date: string;
   amount: number;
+  route?: string;
   note?: string;
   createdAt: string;
 }): DailyRevenue {
@@ -132,6 +133,7 @@ function mapRevenue(r: {
     carId: r.carId,
     date: r.date,
     amount: r.amount,
+    route: r.route,
     note: r.note,
     createdAt: r.createdAt,
   };
@@ -257,6 +259,7 @@ export async function upsertRevenue(input: {
   carId: string;
   date: string;
   amount: number;
+  route?: string;
   note?: string;
 }): Promise<DailyRevenue> {
   await connectMongo();
@@ -264,6 +267,7 @@ export async function upsertRevenue(input: {
   const carId = String(input.carId || '').trim();
   const date = String(input.date || '').trim();
   const amount = Number(input.amount);
+  const route = input.route ? String(input.route).trim() : undefined;
   const note = input.note ? String(input.note).trim() : undefined;
 
   if (!carId || !date || !Number.isFinite(amount) || amount < 0) {
@@ -282,6 +286,7 @@ export async function upsertRevenue(input: {
     {
       $set: {
         amount,
+        route,
         note,
       },
       $setOnInsert: {
@@ -312,7 +317,7 @@ export async function upsertRevenue(input: {
 
 export async function updateRevenue(
   id: string,
-  input: { amount: number; note?: string; date?: string }
+  input: { amount: number; route?: string; note?: string; date?: string }
 ): Promise<DailyRevenue> {
   await connectMongo();
   const row = await RevenueModel.findById(id);
@@ -331,6 +336,7 @@ export async function updateRevenue(
   }
 
   row.amount = input.amount;
+  if (input.route !== undefined) row.route = input.route;
   if (input.note !== undefined) row.note = input.note;
   await row.save();
 

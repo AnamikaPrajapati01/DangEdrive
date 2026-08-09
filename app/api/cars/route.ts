@@ -20,12 +20,12 @@ export async function POST(request: Request) {
     await requireSession('admin');
     const body = await request.json();
     const carNumber = String(body.carNumber || '').trim();
-    const from = String(body.from || '').trim();
-    const to = String(body.to || '').trim();
+    const from = body.from ? String(body.from).trim() : '';
+    const to = body.to ? String(body.to).trim() : '';
 
-    if (!carNumber || !from || !to) {
+    if (!carNumber) {
       return NextResponse.json(
-        { error: 'Car number, from, and to are required.' },
+        { error: 'Car number is required.' },
         { status: 400 }
       );
     }
