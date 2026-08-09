@@ -315,6 +315,47 @@ export async function upsertRevenue(input: {
   return mapRevenue(doc);
 }
 
+export async function createRevenue(input: {
+  carId: string;
+  date: string;
+  amount: number;
+  route?: string;
+  note?: string;
+}): Promise<DailyRevenue> {
+  await connectMongo();
+
+  const carId = String(input.carId || '').trim();
+  const date = String(input.date || '').trim();
+  const amount = Number(input.amount);
+  const route = input.route ? String(input.route).trim() : undefined;
+  const note = input.note ? String(input.note).trim() : undefined;
+
+  if (!carId || !date || !Number.isFinite(amount) || amount < 0) {
+    throw new BadRequestError('Car, date, and a valid amount are required.');
+  }
+
+  const car = await CarModel.findById(carId).lean();
+  if (!car) throw new NotFoundError('Car not found.');
+
+  const newId = `rev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const createdAt = new Date().toISOString();
+
+  const doc = await RevenueModel.create({
+    _id: newId,
+    carId,
+    date,
+    amount,
+    route,
+    note,
+    createdAt,
+  });
+
+  console.log('[createRevenue]', { carId, date, amount, id: newId });
+
+  return mapRevenue(doc.toObject());
+}
+
+
 export async function updateRevenue(
   id: string,
   input: { amount: number; route?: string; note?: string; date?: string }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AuthError, getSessionUser, requireSession } from '@/lib/auth';
-import { isStoreError, listRevenues, upsertRevenue } from '@/lib/db';
+import { isStoreError, listRevenues, createRevenue } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const revenue = await upsertRevenue({ carId, date, amount, route, note });
+    const revenue = await createRevenue({ carId, date, amount, route, note });
     return NextResponse.json({ revenue }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) {

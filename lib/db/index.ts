@@ -9,6 +9,7 @@ export {
   deleteCar,
   listRevenues,
   upsertRevenue,
+  createRevenue,
   updateRevenue,
   deleteRevenue,
   listUsers,

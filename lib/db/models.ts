@@ -36,7 +36,6 @@ const RevenueSchema = new Schema(
   { versionKey: false }
 );
 
-RevenueSchema.index({ carId: 1, date: 1 }, { unique: true });
 
 export type UserDoc = {
   _id: string;
