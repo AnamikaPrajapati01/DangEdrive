@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Coins, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Coins, Pencil, Plus, Trash2, X, CalendarDays, List, ChevronDown, ChevronRight } from 'lucide-react';
 import type { DailyRevenue, FleetCar, SessionUser } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 
@@ -27,6 +27,8 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [filterCar, setFilterCar] = useState('all');
+  const [viewMode, setViewMode] = useState<'list' | 'byDate'>('list');
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!form.carId && cars[0]?.id) {
@@ -40,6 +42,26 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
     if (filterCar === 'all') return revenues;
     return revenues.filter((r) => r.carId === filterCar);
   }, [revenues, filterCar]);
+
+  // Group by date for "By Date" view
+  const byDate = useMemo(() => {
+    const map = new Map<string, DailyRevenue[]>();
+    filtered.forEach((r) => {
+      const existing = map.get(r.date) || [];
+      map.set(r.date, [...existing, r]);
+    });
+    // Sort dates descending
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [filtered]);
+
+  const toggleDate = (date: string) => {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
 
   const openAdd = () => {
     setEditingId(null);
@@ -79,6 +101,7 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            carId: form.carId,
             amount: Number(form.amount),
             date: form.date,
             route: form.route,
@@ -139,18 +162,47 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <select
-            value={filterCar}
-            onChange={(e) => setFilterCar(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none bg-white"
-          >
-            <option value="all">All cars</option>
-            {cars.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.carNumber}
-              </option>
-            ))}
-          </select>
+          {/* View mode toggle */}
+          <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'text-slate-500 hover:text-primary'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('byDate')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'byDate'
+                  ? 'bg-primary text-white'
+                  : 'text-slate-500 hover:text-primary'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              By Date
+            </button>
+          </div>
+
+          {viewMode === 'list' && (
+            <select
+              value={filterCar}
+              onChange={(e) => setFilterCar(e.target.value)}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none bg-white"
+            >
+              <option value="all">All cars</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.carNumber}
+                </option>
+              ))}
+            </select>
+          )}
+
           {isAdmin && (
             <button
               onClick={openAdd}
@@ -186,10 +238,9 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
               <label className="text-xs font-bold text-primary uppercase">Car</label>
               <select
                 required
-                disabled={Boolean(editingId)}
                 value={form.carId}
                 onChange={(e) => setForm((f) => ({ ...f, carId: e.target.value }))}
-                className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none bg-white disabled:bg-slate-50"
+                className="mt-1.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none bg-white"
               >
                 <option value="" disabled>
                   Select a car...
@@ -258,70 +309,177 @@ export default function RevenuePanel({ user, cars, revenues, onChanged }: Revenu
         </form>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase">
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Car</th>
-                <th className="px-6 py-4">Route</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Note</th>
-                {isAdmin && <th className="px-6 py-4">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm">
-              {filtered.map((row) => {
-                const car = carMap[row.carId];
-                return (
-                  <tr key={row.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-3.5 whitespace-nowrap text-text-dark font-medium">{row.date}</td>
-                    <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
-                      {car?.carNumber || '—'}
-                    </td>
-                    <td className="px-6 py-3.5 text-text-secondary whitespace-nowrap">
-                      {row.route || '—'}
-                    </td>
-                    <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Coins className="w-3.5 h-3.5 text-accent" />
-                        {formatCurrency(row.amount)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3.5 text-text-secondary">{row.note || '—'}</td>
-                    {isAdmin && (
-                      <td className="px-6 py-3.5 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openEdit(row)}
-                            className="p-2 rounded-lg border border-slate-200 text-primary hover:bg-slate-50"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(row.id)}
-                            className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={isAdmin ? 6 : 5} className="px-6 py-10 text-center text-text-secondary text-sm">
-                    No revenue entries yet.
-                  </td>
+      {/* ── LIST VIEW ── */}
+      {viewMode === 'list' && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase">
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Car</th>
+                  <th className="px-6 py-4">Route</th>
+                  <th className="px-6 py-4">Amount</th>
+                  <th className="px-6 py-4">Note</th>
+                  {isAdmin && <th className="px-6 py-4">Actions</th>}
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {filtered.map((row) => {
+                  const car = carMap[row.carId];
+                  return (
+                    <tr key={row.id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-3.5 whitespace-nowrap text-text-dark font-medium">{row.date}</td>
+                      <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
+                        {car?.carNumber || '—'}
+                      </td>
+                      <td className="px-6 py-3.5 text-text-secondary whitespace-nowrap">
+                        {row.route || '—'}
+                      </td>
+                      <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Coins className="w-3.5 h-3.5 text-accent" />
+                          {formatCurrency(row.amount)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5 text-text-secondary">{row.note || '—'}</td>
+                      {isAdmin && (
+                        <td className="px-6 py-3.5 whitespace-nowrap">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEdit(row)}
+                              className="p-2 rounded-lg border border-slate-200 text-primary hover:bg-slate-50"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(row.id)}
+                              className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={isAdmin ? 6 : 5} className="px-6 py-10 text-center text-text-secondary text-sm">
+                      No revenue entries yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── BY DATE VIEW ── */}
+      {viewMode === 'byDate' && (
+        <div className="space-y-3">
+          {byDate.length === 0 && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-10 text-center text-text-secondary text-sm">
+              No revenue entries yet.
+            </div>
+          )}
+          {byDate.map(([date, rows]) => {
+            const dayTotal = rows.reduce((sum, r) => sum + r.amount, 0);
+            const isExpanded = expandedDates.has(date);
+            return (
+              <div key={date} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                {/* Date header row — clickable */}
+                <button
+                  onClick={() => toggleDate(date)}
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50/70 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-accent shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                    <div className="w-8 h-8 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                      <CalendarDays className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-extrabold text-primary">{date}</p>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        {rows.length} gaadi{rows.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-text-secondary font-semibold uppercase tracking-wide">Total</p>
+                    <p className="text-base font-extrabold text-primary font-heading">
+                      {formatCurrency(dayTotal)}
+                    </p>
+                  </div>
+                </button>
+
+                {/* Expanded detail table */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-xs font-bold text-primary uppercase">
+                          <th className="px-6 py-3">Car</th>
+                          <th className="px-6 py-3">Route</th>
+                          <th className="px-6 py-3">Amount</th>
+                          <th className="px-6 py-3">Note</th>
+                          {isAdmin && <th className="px-6 py-3">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-sm">
+                        {rows.map((row) => {
+                          const car = carMap[row.carId];
+                          return (
+                            <tr key={row.id} className="hover:bg-slate-50/50">
+                              <td className="px-6 py-3 font-bold text-primary whitespace-nowrap">
+                                {car?.carNumber || '—'}
+                              </td>
+                              <td className="px-6 py-3 text-text-secondary whitespace-nowrap">
+                                {row.route || (car ? `${car.from} → ${car.to}` : '—')}
+                              </td>
+                              <td className="px-6 py-3 font-bold text-primary whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Coins className="w-3.5 h-3.5 text-accent" />
+                                  {formatCurrency(row.amount)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 text-text-secondary">{row.note || '—'}</td>
+                              {isAdmin && (
+                                <td className="px-6 py-3 whitespace-nowrap">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => openEdit(row)}
+                                      className="p-2 rounded-lg border border-slate-200 text-primary hover:bg-slate-50"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(row.id)}
+                                      className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

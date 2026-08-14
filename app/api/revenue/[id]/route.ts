@@ -13,6 +13,7 @@ export async function PUT(request: Request, { params }: Params) {
     const { id } = await params;
     const body = await request.json();
     const amount = Number(body.amount);
+    const carId = body.carId ? String(body.carId).trim() : undefined;
     const route = body.route !== undefined ? String(body.route).trim() : undefined;
     const note = body.note !== undefined ? String(body.note).trim() : undefined;
     const date = body.date ? String(body.date).trim() : undefined;
@@ -21,7 +22,7 @@ export async function PUT(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Valid amount is required.' }, { status: 400 });
     }
 
-    const revenue = await updateRevenue(id, { amount, route, note, date });
+    const revenue = await updateRevenue(id, { amount, carId, route, note, date });
     return NextResponse.json({ revenue });
   } catch (error) {
     if (error instanceof AuthError) {

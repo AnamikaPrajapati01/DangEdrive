@@ -19,9 +19,12 @@ export {
   deleteUser,
   getMonthlyTotals,
   getMonthlyReport,
+  listPayments,
+  createPayment,
+  deletePayment,
   NotFoundError,
   ConflictError,
   BadRequestError,
   isStoreError,
 } from './store';
-export { UserModel, CarModel, RevenueModel } from './models';
+export { UserModel, CarModel, RevenueModel, PaymentModel } from './models';

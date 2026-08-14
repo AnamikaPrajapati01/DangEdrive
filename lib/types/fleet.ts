@@ -42,6 +42,18 @@ export interface MonthlyCarTotal {
   daysLogged: number;
 }
 
+export type PaymentMethod = 'cash' | 'qr_banking';
+
+export interface Payment {
+  id: string;
+  carId: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  method: PaymentMethod;
+  note?: string;
+  createdAt: string;
+}
+
 export interface AppDatabase {
   users: User[];
   cars: FleetCar[];

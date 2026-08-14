@@ -4,11 +4,14 @@ import type {
   DailyRevenue,
   FleetCar,
   MonthlyCarTotal,
+  Payment,
+  PaymentMethod,
   User,
   UserRole,
 } from '@/lib/types';
 import { connectMongo } from './mongodb';
-import { CarModel, RevenueModel, UserModel } from './models';
+import { CarModel, PaymentModel, RevenueModel, UserModel } from './models';
+
 
 function seedCars(): FleetCar[] {
   const routes = [
@@ -358,24 +361,35 @@ export async function createRevenue(input: {
 
 export async function updateRevenue(
   id: string,
-  input: { amount: number; route?: string; note?: string; date?: string }
+  input: { amount: number; carId?: string; route?: string; note?: string; date?: string }
 ): Promise<DailyRevenue> {
   await connectMongo();
   const row = await RevenueModel.findById(id);
   if (!row) throw new NotFoundError('Revenue entry not found.');
 
-  if (input.date && input.date !== row.date) {
+  const newCarId = input.carId ?? row.carId;
+  const newDate = input.date ?? row.date;
+
+  // Only run the clash check if carId or date is actually changing
+  const carIdChanged = input.carId !== undefined && input.carId !== row.carId;
+  const dateChanged = input.date !== undefined && input.date !== row.date;
+
+  console.log('[updateRevenue] id:', id, '| row.date:', row.date, '| input.date:', input.date, '| dateChanged:', dateChanged, '| row.carId:', row.carId, '| input.carId:', input.carId, '| carIdChanged:', carIdChanged);
+
+  if (carIdChanged || dateChanged) {
     const clash = await RevenueModel.findOne({
       _id: { $ne: id },
-      carId: row.carId,
-      date: input.date,
+      carId: newCarId,
+      date: newDate,
     }).lean();
+    console.log('[updateRevenue] clash check => clash found:', !!clash);
     if (clash) {
       throw new ConflictError('This car already has revenue for that date.');
     }
-    row.date = input.date;
   }
 
+  if (carIdChanged) row.carId = input.carId!;
+  if (dateChanged) row.date = input.date!;
   row.amount = input.amount;
   if (input.route !== undefined) row.route = input.route;
   if (input.note !== undefined) row.note = input.note;
@@ -517,4 +531,85 @@ export function isStoreError(
     error instanceof ConflictError ||
     error instanceof BadRequestError
   );
+}
+
+// ---------- Payments (atomic) ----------
+
+function mapPayment(p: {
+  _id: unknown;
+  carId: string;
+  date: string;
+  amount: number;
+  method: 'cash' | 'qr_banking';
+  note?: string;
+  createdAt: string;
+}): Payment {
+  return {
+    id: String(p._id),
+    carId: p.carId,
+    date: p.date,
+    amount: p.amount,
+    method: p.method,
+    note: p.note,
+    createdAt: p.createdAt,
+  };
+}
+
+export async function listPayments(filters?: {
+  method?: PaymentMethod;
+  date?: string;
+}): Promise<Payment[]> {
+  await connectMongo();
+  const query: Record<string, unknown> = {};
+  if (filters?.method) query.method = filters.method;
+  if (filters?.date) query.date = filters.date;
+  const rows = await PaymentModel.find(query).sort({ date: -1, createdAt: -1 }).lean();
+  return rows.map(mapPayment);
+}
+
+export async function createPayment(input: {
+  carId: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  note?: string;
+}): Promise<Payment> {
+  await connectMongo();
+
+  const carId = String(input.carId || '').trim();
+  const date = String(input.date || '').trim();
+  const amount = Number(input.amount);
+  const method = input.method;
+  const note = input.note ? String(input.note).trim() : undefined;
+
+  if (!carId || !date || !Number.isFinite(amount) || amount < 0) {
+    throw new BadRequestError('Car, date, and a valid amount are required.');
+  }
+  if (!['cash', 'qr_banking'].includes(method)) {
+    throw new BadRequestError('Method must be cash or qr_banking.');
+  }
+
+  const car = await CarModel.findById(carId).lean();
+  if (!car) throw new NotFoundError('Car not found.');
+
+  const newId = `pay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const createdAt = new Date().toISOString();
+
+  const doc = await PaymentModel.create({
+    _id: newId,
+    carId,
+    date,
+    amount,
+    method,
+    note,
+    createdAt,
+  });
+
+  return mapPayment(doc.toObject());
+}
+
+export async function deletePayment(id: string): Promise<void> {
+  await connectMongo();
+  const result = await PaymentModel.deleteOne({ _id: id });
+  if (result.deletedCount === 0) throw new NotFoundError('Payment record not found.');
 }

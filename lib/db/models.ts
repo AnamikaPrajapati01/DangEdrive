@@ -63,6 +63,30 @@ export type RevenueDoc = {
   createdAt: string;
 };
 
+const PaymentSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    carId: { type: String, required: true, index: true },
+    date: { type: String, required: true, index: true },
+    amount: { type: Number, required: true, min: 0 },
+    method: { type: String, enum: ['cash', 'qr_banking'], required: true },
+    note: { type: String },
+    createdAt: { type: String, required: true },
+  },
+  { versionKey: false }
+);
+
+export type PaymentDoc = {
+  _id: string;
+  carId: string;
+  date: string;
+  amount: number;
+  method: 'cash' | 'qr_banking';
+  note?: string;
+  createdAt: string;
+};
+
 export const UserModel = models.User || model('User', UserSchema);
 export const CarModel = models.Car || model('Car', CarSchema);
 export const RevenueModel = models.Revenue || model('Revenue', RevenueSchema);
+export const PaymentModel = models.Payment || model('Payment', PaymentSchema);

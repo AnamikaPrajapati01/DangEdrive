@@ -9,10 +9,11 @@ import {
   RevenuePanel,
   MonthlyReport,
   ShareholdersPanel,
+  PaymentPanel,
 } from '@/components/portal';
 import type { DailyRevenue, FleetCar, SessionUser } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Car, Coins, CalendarRange, Eye, ShieldCheck } from 'lucide-react';
+import { Car, Coins, CalendarRange, Eye, ShieldCheck, CreditCard } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -191,7 +192,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <button
                   onClick={() => setActiveTab('cars')}
                   className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-left hover:border-primary/30 transition-colors"
@@ -217,6 +218,18 @@ export default function DashboardPage() {
                   <p className="text-sm font-bold text-primary">Monthly Totals</p>
                   <p className="text-xs text-text-secondary mt-1">
                     Month-end total for each car
+                  </p>
+                </button>
+                <button
+                  onClick={() => setActiveTab('payment')}
+                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm text-left hover:border-primary/30 transition-colors"
+                >
+                  <p className="text-sm font-bold text-primary flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-accent" />
+                    Payment
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    Track Cash, QR & Banking payments
                   </p>
                 </button>
               </div>
@@ -282,6 +295,10 @@ export default function DashboardPage() {
           {activeTab === 'monthly' && <MonthlyReport refreshKey={refreshKey} />}
 
           {activeTab === 'users' && <ShareholdersPanel user={user} />}
+
+          {activeTab === 'payment' && (
+            <PaymentPanel user={user} cars={cars} />
+          )}
         </main>
       </div>
     </div>
