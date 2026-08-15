@@ -22,6 +22,7 @@ export {
   listPayments,
   createPayment,
   deletePayment,
+  updatePayment,
   NotFoundError,
   ConflictError,
   BadRequestError,

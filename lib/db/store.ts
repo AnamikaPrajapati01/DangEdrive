@@ -613,3 +613,33 @@ export async function deletePayment(id: string): Promise<void> {
   const result = await PaymentModel.deleteOne({ _id: id });
   if (result.deletedCount === 0) throw new NotFoundError('Payment record not found.');
 }
+
+export async function updatePayment(
+  id: string,
+  input: { carId?: string; date?: string; amount?: number; method?: PaymentMethod; note?: string }
+): Promise<Payment> {
+  await connectMongo();
+  const row = await PaymentModel.findById(id);
+  if (!row) throw new NotFoundError('Payment record not found.');
+
+  if (input.carId !== undefined) {
+    const car = await CarModel.findById(input.carId).lean();
+    if (!car) throw new NotFoundError('Car not found.');
+    row.carId = input.carId;
+  }
+  if (input.date !== undefined) row.date = input.date;
+  if (input.amount !== undefined) {
+    if (!Number.isFinite(input.amount) || input.amount < 0)
+      throw new BadRequestError('Amount must be a non-negative number.');
+    row.amount = input.amount;
+  }
+  if (input.method !== undefined) {
+    if (!['cash', 'qr_banking'].includes(input.method))
+      throw new BadRequestError('Method must be cash or qr_banking.');
+    row.method = input.method;
+  }
+  if (input.note !== undefined) row.note = input.note;
+
+  await row.save();
+  return mapPayment(row.toObject());
+}

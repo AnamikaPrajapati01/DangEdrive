@@ -9,6 +9,11 @@ import {
   X,
   Plus,
   Coins,
+  List,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
 } from 'lucide-react';
 import type { FleetCar, Payment, PaymentMethod, SessionUser } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -42,6 +47,10 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [methodFilter, setMethodFilter] = useState<MethodFilter>('all');
+  const [carFilter, setCarFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'byDate'>('list');
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,10 +88,39 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
     }
   }, [cars, form.carId]);
 
+  const hasActiveFilters = methodFilter !== 'all' || carFilter !== '';
+
   const filtered = useMemo(() => {
-    if (methodFilter === 'all') return payments;
-    return payments.filter((p) => p.method === methodFilter);
-  }, [payments, methodFilter]);
+    return payments.filter((p) => {
+      if (methodFilter !== 'all' && p.method !== methodFilter) return false;
+      if (carFilter && p.carId !== carFilter) return false;
+      return true;
+    });
+  }, [payments, methodFilter, carFilter]);
+
+  // Group by date for By Date view
+  const byDate = useMemo(() => {
+    const map = new Map<string, Payment[]>();
+    payments.forEach((p) => {
+      const existing = map.get(p.date) || [];
+      map.set(p.date, [...existing, p]);
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [payments]);
+
+  const toggleDate = (date: string) => {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setMethodFilter('all');
+    setCarFilter('');
+  };
 
   const totals = useMemo(() => {
     const cash = payments.filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
@@ -91,12 +129,26 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
   }, [payments]);
 
   const openAdd = () => {
+    setEditingId(null);
     setForm({
       carId: cars[0]?.id || '',
       date: today,
       amount: '',
       method: 'cash',
       note: '',
+    });
+    setError(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (p: Payment) => {
+    setEditingId(p.id);
+    setForm({
+      carId: p.carId,
+      date: p.date,
+      amount: String(p.amount),
+      method: p.method,
+      note: p.note || '',
     });
     setError(null);
     setShowForm(true);
@@ -109,20 +161,37 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          carId: form.carId,
-          date: form.date,
-          amount: Number(form.amount),
-          method: form.method,
-          note: form.note,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save payment');
+      if (editingId) {
+        const res = await fetch(`/api/payments/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            carId:  form.carId,
+            date:   form.date,
+            amount: Number(form.amount),
+            method: form.method,
+            note:   form.note,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update payment');
+      } else {
+        const res = await fetch('/api/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            carId:  form.carId,
+            date:   form.date,
+            amount: Number(form.amount),
+            method: form.method,
+            note:   form.note,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save payment');
+      }
       setShowForm(false);
+      setEditingId(null);
       await loadPayments();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -158,15 +227,40 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
             {!isAdmin && ' · view only'}
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={openAdd}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-hover shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Add Payment
-          </button>
-        )}
+
+        <div className="flex flex-wrap gap-3">
+          {/* List / By Date toggle */}
+          <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'list' ? 'bg-primary text-white' : 'text-slate-500 hover:text-primary'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('byDate')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors ${
+                viewMode === 'byDate' ? 'bg-primary text-white' : 'text-slate-500 hover:text-primary'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              By Date
+            </button>
+          </div>
+
+          {isAdmin && (
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-hover shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add Payment
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Summary Cards ── */}
@@ -215,7 +309,9 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
           className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4"
         >
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-extrabold text-primary uppercase tracking-wider">Add Payment</h4>
+            <h4 className="text-sm font-extrabold text-primary uppercase tracking-wider">
+              {editingId ? 'Edit Payment' : 'Add Payment'}
+            </h4>
             <button
               type="button"
               onClick={() => setShowForm(false)}
@@ -311,104 +407,267 @@ export default function PaymentPanel({ user, cars }: PaymentPanelProps) {
             disabled={saving || cars.length === 0}
             className="px-5 py-2.5 rounded-xl bg-accent text-white text-sm font-bold hover:bg-accent-hover disabled:opacity-60"
           >
-            {saving ? 'Saving...' : 'Save Payment'}
+            {saving ? 'Saving...' : editingId ? 'Update Payment' : 'Save Payment'}
           </button>
         </form>
       )}
 
-      {/* ── Method Filter Tabs ── */}
-      <div className="flex flex-wrap gap-2">
-        {(['all', 'cash', 'qr_banking'] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMethodFilter(m)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
-              methodFilter === m
-                ? 'bg-primary text-white border-primary shadow-sm'
-                : 'bg-white text-text-secondary border-slate-200 hover:border-primary/40 hover:text-primary'
-            }`}
-          >
-            {m === 'all' ? 'All Payments' : METHOD_LABEL[m]}
-          </button>
-        ))}
-      </div>
+      {/* ── LIST VIEW ── */}
+      {viewMode === 'list' && (
+        <>
+          {/* Filters — only in list mode */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Method tabs */}
+            {(['all', 'cash', 'qr_banking'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMethodFilter(m)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                  methodFilter === m
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-text-secondary border-slate-200 hover:border-primary/40 hover:text-primary'
+                }`}
+              >
+                {m === 'all' ? 'All Payments' : METHOD_LABEL[m]}
+              </button>
+            ))}
 
-      {/* ── Payments Table ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="px-6 py-10 text-center text-text-secondary text-sm">Loading...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase">
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Car</th>
-                  <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Method</th>
-                  <th className="px-6 py-4">Note</th>
-                  {isAdmin && <th className="px-6 py-4">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50 text-sm">
-                {filtered.map((p) => {
-                  const car = carMap[p.carId];
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-3.5 whitespace-nowrap text-text-dark font-medium">
-                        {p.date}
-                      </td>
-                      <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
-                        {car?.carNumber || '—'}
-                      </td>
-                      <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Coins className="w-3.5 h-3.5 text-accent" />
-                          {formatCurrency(p.amount)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${METHOD_STYLE[p.method]}`}
-                        >
-                          {METHOD_ICON[p.method]}
-                          {METHOD_LABEL[p.method]}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-text-secondary">{p.note || '—'}</td>
-                      {isAdmin && (
-                        <td className="px-6 py-3.5">
-                          <button
-                            onClick={() => handleDelete(p.id)}
-                            className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={isAdmin ? 6 : 5}
-                      className="px-6 py-10 text-center text-text-secondary text-sm"
-                    >
-                      No payment records yet.
-                      {isAdmin && (
-                        <span className="block mt-1 text-xs">
-                          Click &ldquo;Add Payment&rdquo; to record one.
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+
+            {/* Car */}
+            <select
+              value={carFilter}
+              onChange={(e) => setCarFilter(e.target.value)}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none bg-white"
+            >
+              <option value="">All cars</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>{c.carNumber}</option>
+              ))}
+            </select>
+
+            {/* Clear */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2.5 rounded-xl border border-rose-200 text-rose-600 bg-white text-sm font-bold hover:bg-rose-50 transition-all"
+              >
+                Clear
+              </button>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            {loading ? (
+              <div className="px-6 py-10 text-center text-text-secondary text-sm">Loading...</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold text-primary uppercase">
+                      <th className="px-6 py-4">Date</th>
+                      <th className="px-6 py-4">Car</th>
+                      <th className="px-6 py-4">Amount</th>
+                      <th className="px-6 py-4">Method</th>
+                      <th className="px-6 py-4">Note</th>
+                      {isAdmin && <th className="px-6 py-4">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-sm">
+                    {filtered.map((p) => {
+                      const car = carMap[p.carId];
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50">
+                          <td className="px-6 py-3.5 whitespace-nowrap text-text-dark font-medium">
+                            {p.date}
+                          </td>
+                          <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
+                            {car?.carNumber || '—'}
+                          </td>
+                          <td className="px-6 py-3.5 font-bold text-primary whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Coins className="w-3.5 h-3.5 text-accent" />
+                              {formatCurrency(p.amount)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${METHOD_STYLE[p.method]}`}
+                            >
+                              {METHOD_ICON[p.method]}
+                              {METHOD_LABEL[p.method]}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5 text-text-secondary">{p.note || '—'}</td>
+                          {isAdmin && (
+                            <td className="px-6 py-3.5">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openEdit(p)}
+                                  className="p-2 rounded-lg border border-slate-200 text-primary hover:bg-slate-50"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(p.id)}
+                                  className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={isAdmin ? 6 : 5}
+                          className="px-6 py-10 text-center text-text-secondary text-sm"
+                        >
+                          No payment records yet.
+                          {isAdmin && (
+                            <span className="block mt-1 text-xs">
+                              Click &ldquo;Add Payment&rdquo; to record one.
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── BY DATE VIEW ── */}
+      {viewMode === 'byDate' && (
+        <div className="space-y-3">
+          {loading && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-10 text-center text-text-secondary text-sm">
+              Loading...
+            </div>
+          )}
+          {!loading && byDate.length === 0 && (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-10 text-center text-text-secondary text-sm">
+              No payment records yet.
+            </div>
+          )}
+          {byDate.map(([date, rows]) => {
+            const dayTotal = rows.reduce((sum, p) => sum + p.amount, 0);
+            const dayCash = rows.filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+            const dayQr   = rows.filter((p) => p.method === 'qr_banking').reduce((s, p) => s + p.amount, 0);
+            const isExpanded = expandedDates.has(date);
+            return (
+              <div key={date} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                {/* Date header row — clickable */}
+                <button
+                  onClick={() => toggleDate(date)}
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50/70 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-accent shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                    <div className="w-8 h-8 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
+                      <CalendarDays className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-extrabold text-primary">{date}</p>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        {rows.length} payment{rows.length !== 1 ? 's' : ''}
+                        {dayCash > 0 && (
+                          <span className="ml-2 text-emerald-600 font-semibold">
+                            Cash {formatCurrency(dayCash)}
+                          </span>
+                        )}
+                        {dayQr > 0 && (
+                          <span className="ml-2 text-violet-600 font-semibold">
+                            QR {formatCurrency(dayQr)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-text-secondary font-semibold uppercase tracking-wide">Total</p>
+                    <p className="text-base font-extrabold text-primary font-heading">
+                      {formatCurrency(dayTotal)}
+                    </p>
+                  </div>
+                </button>
+
+                {/* Expanded detail table */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-xs font-bold text-primary uppercase">
+                          <th className="px-6 py-3">Car</th>
+                          <th className="px-6 py-3">Amount</th>
+                          <th className="px-6 py-3">Method</th>
+                          <th className="px-6 py-3">Note</th>
+                          {isAdmin && <th className="px-6 py-3">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-sm">
+                        {rows.map((p) => {
+                          const car = carMap[p.carId];
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/50">
+                              <td className="px-6 py-3 font-bold text-primary whitespace-nowrap">
+                                {car?.carNumber || '—'}
+                              </td>
+                              <td className="px-6 py-3 font-bold text-primary whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Coins className="w-3.5 h-3.5 text-accent" />
+                                  {formatCurrency(p.amount)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${METHOD_STYLE[p.method]}`}
+                                >
+                                  {METHOD_ICON[p.method]}
+                                  {METHOD_LABEL[p.method]}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 text-text-secondary">{p.note || '—'}</td>
+                              {isAdmin && (
+                                <td className="px-6 py-3">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => openEdit(p)}
+                                      className="p-2 rounded-lg border border-slate-200 text-primary hover:bg-slate-50"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(p.id)}
+                                      className="p-2 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
